@@ -38,10 +38,6 @@
 		) {
 			board[r][c] = " ";
 			e.preventDefault();
-		} else if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
-			board[r][c] = e.key.toUpperCase();
-			// Auto-advance
-			advanceFocus();
 		}
 	}
 
