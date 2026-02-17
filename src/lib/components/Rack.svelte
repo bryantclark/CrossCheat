@@ -15,7 +15,7 @@
 <div class="flex flex-col gap-2 p-3 bg-white/50 backdrop-blur-md rounded-xl border border-white/20 shadow-lg">
 	<div class="flex items-center justify-between mb-1">
 		<label for="rack-input" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-			Your Tiles
+			Your Tiles (use ? for blanks)
 		</label>
 		<button
 			onclick={() => (rack = '')}
@@ -34,7 +34,6 @@
 			maxlength={7}
 			class="flex-1 px-3 py-2 text-xl font-mono font-bold tracking-widest text-center border-2 border-slate-200 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none transition-all uppercase"
 		/>
-		<span class="text-[10px] text-slate-400 font-medium shrink-0">? = blank</span>
 		<div class="flex gap-1.5">
 			{#each tiles as char}
 				<div

@@ -20,24 +20,8 @@
 			</p>
 		</div>
 
-		<!-- Video Preview -->
-		<div class="relative group w-full" in:fly={{ y: 20, duration: 800, delay: 400 }}>
-			<div class="absolute -inset-1 bg-gradient-to-r from-orange-400 to-orange-600 rounded-[2.5rem] blur opacity-25"></div>
-			<div class="relative bg-slate-50 rounded-[2rem] overflow-hidden aspect-video flex items-center justify-center">
-				<video 
-					src="/demo.mp4" 
-					autoplay 
-					loop 
-					muted 
-					playsinline
-					class="w-full h-full object-fit"
-				></video>
-				
-			</div>
-		</div>
-
-		<!-- Actions -->
-		<div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4" in:fly={{ y: 20, duration: 800, delay: 600 }}>
+		<!-- Actions (Moved Above Video) -->
+		<div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4" in:fly={{ y: 20, duration: 800, delay: 400 }}>
 			<a 
 				href="/solve"
 				class="group relative px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:shadow-orange-500/20 transition-all active:scale-95 overflow-hidden w-full sm:w-auto"
@@ -52,6 +36,22 @@
 				How it works
 			</button>
 		</div>
+
+		<!-- Video Preview -->
+		<div class="relative group w-full" in:fly={{ y: 20, duration: 800, delay: 600 }}>
+			<div class="absolute -inset-1 bg-gradient-to-r from-orange-400 to-orange-600 rounded-[2.5rem] blur opacity-25"></div>
+			<div class="relative bg-slate-50 rounded-[2rem] overflow-hidden aspect-video flex items-center justify-center">
+				<video 
+					src="/demo.mp4" 
+					autoplay 
+					loop 
+					muted 
+					playsinline
+					class="w-full h-full object-fit"
+				>
+			</video>
+			</div>
+		</div>
 	</div>
 
 	<div id="deep-dive" class="w-full">
@@ -60,6 +60,6 @@
 
 	<!-- Footer -->
 	<footer class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] py-8" in:fade={{ delay: 1000 }}>
-		Built out of curiosity • Powered by NASPA NWL23
+		Built out of curiosity • Powered by ENABLE Dictionary
 	</footer>
 </div>

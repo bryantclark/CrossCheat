@@ -28,6 +28,7 @@ CrossCheat is a high-performance crossword game solver and analysis tool built w
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/bryantclark/CrossCheat.git
    cd CrossCheat
