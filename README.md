@@ -1,6 +1,6 @@
 # CrossCheat
 
-CrossCheat is a high-performance crossword game solver and analysis tool built with SvelteKit. It helps players find the best moves for NYT CrossPlay using the NASPA NWL23 dictionary. It was mostly built for my own curiousity on efficient algorthms after I built a brute force one and was surprised how slow it was. Front end is mostly built with gemini flash and antigravity. The code I find interesting is all in the `src/lib/solver` directory.
+CrossCheat is a high-performance crossword game solver and analysis tool built with SvelteKit. It helps players find the best moves for NYT CrossPlay using the NASPA NWL23 dictionary. It was mostly built for my own curiousity on efficient algorthms after I built a brute force one and was surprised how slow it was. Front end was mostly built with Gemini flash in Google Antigravity. The code I find interesting is all in the `src/lib/solver` directory.
 
 ## Features
 
