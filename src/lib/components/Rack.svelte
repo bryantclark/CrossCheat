@@ -1,18 +1,19 @@
 <script lang="ts">
-	import { LETTER_VALUES } from "$lib/solver/constants";
+	import type { GameConfig } from "$lib/solver/games";
 
-	let { rack = $bindable("") } = $props();
+	let { rack = $bindable(""), config }: { rack: string; config: GameConfig } =
+		$props();
 
 	function handleInput(e: Event) {
 		const target = e.target as HTMLInputElement;
 		rack = target.value
 			.toUpperCase()
 			.replace(/[^A-Z?]/g, "")
-			.slice(0, 7);
+			.slice(0, config.rackSize);
 		target.value = rack;
 	}
 
-	let tiles = $derived(rack.padEnd(7, " ").split(""));
+	let tiles = $derived(rack.padEnd(config.rackSize, " ").split(""));
 </script>
 
 <div
@@ -35,11 +36,12 @@
 	<div class="flex flex-col sm:flex-row gap-3 items-center">
 		<input
 			id="rack-input"
+			data-testid="rack-input"
 			type="text"
 			value={rack}
 			oninput={handleInput}
-			placeholder="ABCDEFG"
-			maxlength={7}
+			placeholder={"A".repeat(config.rackSize)}
+			maxlength={config.rackSize}
 			class="w-full sm:flex-1 px-4 lg:px-3 py-3 lg:py-2 text-2xl lg:text-xl font-mono font-bold tracking-[0.3em] lg:tracking-widest text-center border-2 border-slate-200 rounded-xl lg:rounded-lg focus:border-orange-500 focus:ring-4 lg:ring-2 focus:ring-orange-100 outline-none transition-all uppercase bg-white shadow-inner lg:shadow-none"
 		/>
 		<div class="flex gap-1.5 justify-center">
@@ -52,7 +54,7 @@
 						<span
 							class="absolute bottom-1 right-1 text-[7px] md:text-[8px] font-black lg:font-bold opacity-60 leading-none"
 						>
-							{LETTER_VALUES[char.toUpperCase()] || 0}
+							{config.letterValues[char.toUpperCase()] ?? 0}
 						</span>
 					{/if}
 				</div>

@@ -1,12 +1,6 @@
-/**
- * Shared test utilities for solver tests.
- *
- * Provides dictionary loading, board generation, tile bag management,
- * and comparison helpers.
- */
-
 import { Trie } from "../trie";
 import type { Move } from "../scorer";
+import type { GameConfig } from "../games";
 
 // ── Dictionary loading ───────────────────────────────────────
 
@@ -31,13 +25,14 @@ export async function loadTestDictionary(): Promise<TestDictionary> {
   for (const word of words) {
     trie.insert(word);
   }
-  console.log(`Test setup: loaded ${dictionary.size} words`);
+
   return { dictionary, trie };
 }
 
 // ── Tile bag ─────────────────────────────────────────────────
 
-const TILE_DISTRIBUTION: [string, number][] = [
+// Default distribution (Scrabble-like)
+const DEFAULT_TILE_DISTRIBUTION: [string, number][] = [
   ["A", 9],
   ["B", 2],
   ["C", 2],
@@ -67,9 +62,11 @@ const TILE_DISTRIBUTION: [string, number][] = [
   ["?", 2],
 ];
 
-export function makeBag(): string[] {
+export function makeBag(
+  distribution: [string, number][] = DEFAULT_TILE_DISTRIBUTION,
+): string[] {
   const bag: string[] = [];
-  for (const [letter, count] of TILE_DISTRIBUTION) {
+  for (const [letter, count] of distribution) {
     for (let i = 0; i < count; i++) bag.push(letter);
   }
   return bag;
@@ -90,8 +87,10 @@ export function drawRack(bag: string[], count: number = 7): string {
 
 // ── Board utilities ──────────────────────────────────────────
 
-export function emptyBoard(): string[][] {
-  return Array.from({ length: 15 }, () => Array(15).fill(" "));
+export function emptyBoard(config: GameConfig): string[][] {
+  return Array.from({ length: config.boardHeight }, () =>
+    Array(config.boardWidth).fill(" "),
+  );
 }
 
 export function placeWord(
@@ -100,10 +99,11 @@ export function placeWord(
   r: number,
   c: number,
   d: "H" | "V",
+  config: GameConfig,
 ): boolean {
   const endR = d === "V" ? r + word.length - 1 : r;
   const endC = d === "H" ? c + word.length - 1 : c;
-  if (endR > 14 || endC > 14) return false;
+  if (endR >= config.boardHeight || endC >= config.boardWidth) return false;
 
   for (let i = 0; i < word.length; i++) {
     const pr = d === "V" ? r + i : r;
@@ -122,13 +122,18 @@ export function placeWord(
 /**
  * Validate that every horizontal and vertical word on the board is in the dictionary.
  */
-export function validateAllWords(board: string[][], trieRef: Trie): boolean {
-  for (let r = 0; r < 15; r++) {
+export function validateAllWords(
+  board: string[][],
+  trieRef: Trie,
+  config: GameConfig,
+): boolean {
+  const { boardWidth, boardHeight } = config;
+  for (let r = 0; r < boardHeight; r++) {
     let c = 0;
-    while (c < 15) {
+    while (c < boardWidth) {
       if (board[r][c] !== " ") {
         let word = "";
-        while (c < 15 && board[r][c] !== " ") {
+        while (c < boardWidth && board[r][c] !== " ") {
           word += board[r][c];
           c++;
         }
@@ -138,12 +143,12 @@ export function validateAllWords(board: string[][], trieRef: Trie): boolean {
       }
     }
   }
-  for (let c = 0; c < 15; c++) {
+  for (let c = 0; c < boardWidth; c++) {
     let r = 0;
-    while (r < 15) {
+    while (r < boardHeight) {
       if (board[r][c] !== " ") {
         let word = "";
-        while (r < 15 && board[r][c] !== " ") {
+        while (r < boardHeight && board[r][c] !== " ") {
           word += board[r][c];
           r++;
         }
@@ -158,16 +163,18 @@ export function validateAllWords(board: string[][], trieRef: Trie): boolean {
 
 /**
  * Generate a board with `numWords` valid dictionary words placed on it.
- * The first word always crosses center (7,7). Subsequent words are placed
+ * The first word always crosses center. Subsequent words are placed
  * so they intersect existing tiles (sharing at least one letter).
  */
 export function generateBoard(
   numWords: number,
   dictionary: Set<string>,
   trie: Trie,
+  config: GameConfig,
 ): string[][] {
+  const { boardWidth, boardHeight, centerSquare } = config;
   for (let attempt = 0; attempt < 50; attempt++) {
-    const board = emptyBoard();
+    const board = emptyBoard(config);
     const words = pickRandomWords(numWords * 3, dictionary);
     let placed = 0;
     let wordIdx = 0;
@@ -176,9 +183,9 @@ export function generateBoard(
       const word = words[wordIdx++];
       const d: "H" | "V" = Math.random() < 0.5 ? "H" : "V";
       const offset = Math.floor(Math.random() * word.length);
-      const r = d === "V" ? 7 - offset : 7;
-      const c = d === "H" ? 7 - offset : 7;
-      if (r >= 0 && c >= 0 && placeWord(board, word, r, c, d)) {
+      const r = d === "V" ? centerSquare[0] - offset : centerSquare[0];
+      const c = d === "H" ? centerSquare[1] - offset : centerSquare[1];
+      if (r >= 0 && c >= 0 && placeWord(board, word, r, c, d, config)) {
         placed++;
       }
     }
@@ -188,8 +195,8 @@ export function generateBoard(
     while (placed < numWords && wordIdx < words.length) {
       const word = words[wordIdx++];
       const occupied: [number, number][] = [];
-      for (let r = 0; r < 15; r++) {
-        for (let c = 0; c < 15; c++) {
+      for (let r = 0; r < boardHeight; r++) {
+        for (let c = 0; c < boardWidth; c++) {
           if (board[r][c] !== " ") occupied.push([r, c]);
         }
       }
@@ -207,9 +214,9 @@ export function generateBoard(
             if (sr < 0 || sc < 0) continue;
 
             const test = board.map((row) => [...row]);
-            if (placeWord(test, word, sr, sc, d)) {
-              if (validateAllWords(test, trie)) {
-                placeWord(board, word, sr, sc, d);
+            if (placeWord(test, word, sr, sc, d, config)) {
+              if (validateAllWords(test, trie, config)) {
+                placeWord(board, word, sr, sc, d, config);
                 didPlace = true;
                 break;
               }
@@ -228,10 +235,10 @@ export function generateBoard(
     }
   }
 
-  const board = emptyBoard();
+  const board = emptyBoard(config);
   const word =
     [...dictionary].find((w) => w.length >= 3 && w.length <= 5) || "CAT";
-  placeWord(board, word, 7, 7, "H");
+  placeWord(board, word, centerSquare[0], centerSquare[1], "H", config);
   return board;
 }
 
@@ -243,11 +250,14 @@ function pickRandomWords(n: number, dict: Set<string>): string[] {
 
 // ── Display utilities ────────────────────────────────────────
 
-export function boardToString(board: string[][]): string {
+export function boardToString(board: string[][], config: GameConfig): string {
+  const { boardWidth, boardHeight } = config;
   const header =
     "    " +
-    Array.from({ length: 15 }, (_, i) => String(i).padStart(3)).join("");
-  const divider = "   +" + "-".repeat(45);
+    Array.from({ length: boardWidth }, (_, i) => String(i).padStart(3)).join(
+      "",
+    );
+  const divider = "   +" + "-".repeat(boardWidth * 3);
   const rows = board.map((row, i) => {
     const cells = row.map((c) => (c === " " ? " . " : ` ${c} `)).join("");
     return `${String(i).padStart(2)} |${cells}`;
@@ -268,8 +278,8 @@ export function removeBoardTilesFromBag(
   board: string[][],
   bag: string[],
 ): void {
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) {
+  for (let r = 0; r < board.length; r++) {
+    for (let c = 0; c < board[r].length; c++) {
       if (board[r][c] !== " ") {
         const idx = bag.indexOf(board[r][c]);
         if (idx !== -1) bag.splice(idx, 1);

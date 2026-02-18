@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { BOARD_MULT, LETTER_VALUES } from "$lib/solver/constants";
+	import type { GameConfig } from "$lib/solver/games";
+	import { CROSSPLAY_CONFIG } from "$lib/solver/games";
 
 	let {
 		board = $bindable(
@@ -7,12 +8,26 @@
 				.fill(null)
 				.map(() => Array(15).fill(" ")),
 		),
-		previewBoard = undefined as string[][] | undefined,
+		previewBoard = undefined,
+		config = CROSSPLAY_CONFIG,
+	}: {
+		board: string[][];
+		previewBoard: string[][] | undefined;
+		config: GameConfig;
 	} = $props();
 
 	let displayBoard = $derived(previewBoard ?? board);
 
-	let focusedCell = $state({ r: 7, c: 7 });
+	// Focus management
+	let focusedCell = $state({ r: -1, c: -1 });
+
+	// Reset focus when config changes (center square might change)
+	$effect(() => {
+		focusedCell = {
+			r: config.centerSquare[0],
+			c: config.centerSquare[1],
+		};
+	});
 	let boardContainer: HTMLElement;
 	let inputRef: HTMLInputElement;
 
@@ -23,13 +38,13 @@
 			focusedCell = { r: Math.max(0, r - 1), c };
 			e.preventDefault();
 		} else if (e.key === "ArrowDown") {
-			focusedCell = { r: Math.min(14, r + 1), c };
+			focusedCell = { r: Math.min(config.boardHeight - 1, r + 1), c };
 			e.preventDefault();
 		} else if (e.key === "ArrowLeft") {
 			focusedCell = { r, c: Math.max(0, c - 1) };
 			e.preventDefault();
 		} else if (e.key === "ArrowRight") {
-			focusedCell = { r, c: Math.min(14, c + 1) };
+			focusedCell = { r, c: Math.min(config.boardWidth - 1, c + 1) };
 			e.preventDefault();
 		} else if (
 			e.key === " " ||
@@ -58,9 +73,9 @@
 
 	function advanceFocus() {
 		const { r, c } = focusedCell;
-		if (c < 14) {
+		if (c < config.boardWidth - 1) {
 			focusedCell = { r, c: c + 1 };
-		} else if (r < 14) {
+		} else if (r < config.boardHeight - 1) {
 			focusedCell = { r: r + 1, c: 0 };
 		}
 	}
@@ -70,45 +85,45 @@
 		inputRef?.focus();
 	}
 
+	const MULTIPLIER_STYLES: Record<string, string> = {
+		TWS: "bg-purple-50 border-purple-100 text-purple-400",
+		DWS: "bg-blue-50 border-blue-100 text-blue-400",
+		TLS: "bg-emerald-50 border-emerald-100 text-emerald-400",
+		DLS: "bg-amber-50 border-amber-100 text-amber-500",
+		STP: "bg-white border-slate-200 text-slate-400",
+	};
+
 	function cellClass(r: number, c: number): string {
-		const mult = BOARD_MULT[r][c];
+		const mult = config.boardMultipliers[r][c];
 		const isFocused = focusedCell.r === r && focusedCell.c === c;
 
-		const base =
-			"cell border flex items-center justify-center text-[8px] md:text-[10px] font-black transition-all cursor-pointer relative rounded-sm";
-
-		let colors = "bg-white border-slate-100 text-slate-300";
-		if (mult === "3W")
-			colors = "bg-purple-50 border-purple-100 text-purple-400";
-		else if (mult === "2W")
-			colors = "bg-blue-50 border-blue-100 text-blue-400";
-		else if (mult === "3L")
-			colors = "bg-emerald-50 border-emerald-100 text-emerald-400";
-		else if (mult === "2L")
-			colors = "bg-amber-50 border-amber-100 text-amber-500";
-		else if (mult === "ST")
-			colors = "bg-white border-slate-200 text-slate-400";
-
-		const focus = isFocused
-			? "z-20 border-orange-500 ring-2 ring-orange-500/20"
-			: "";
-
-		return `${base} ${colors} ${focus}`;
+		return [
+			"cell border flex items-center justify-center text-[8px] md:text-[10px] font-black transition-all cursor-pointer relative rounded-sm",
+			MULTIPLIER_STYLES[mult] ||
+				"bg-white border-slate-100 text-slate-300",
+			isFocused ? "z-20 border-orange-500 ring-2 ring-orange-500/20" : "",
+		].join(" ");
 	}
 
 	function isPreview(char: string): boolean {
 		return char === char.toLowerCase() && char !== " ";
 	}
 
+	const LABEL_MAP: Record<string, string> = {
+		TWS: "3W",
+		DWS: "2W",
+		TLS: "3L",
+		DLS: "2L",
+		STP: "SP",
+	};
+
 	function multLabel(r: number, c: number): string {
-		const mult = BOARD_MULT[r][c];
-		if (mult === "ST") return "SP";
-		if (mult === "  ") return "";
-		return mult;
+		const mult = config.boardMultipliers[r][c];
+		return LABEL_MAP[mult] || "";
 	}
 </script>
 
-<div class="relative w-full max-w-[min(90vw,600px)] aspect-square mx-auto">
+<div class="relative w-full max-w-[min(90vw,540px)] aspect-square mx-auto">
 	<!-- Hidden input for mobile keyboard -->
 	<input
 		bind:this={inputRef}
@@ -121,9 +136,10 @@
 
 	<div
 		bind:this={boardContainer}
-		class="grid grid-cols-15 gap-0 border-2 border-slate-300 shadow-xl rounded-lg overflow-hidden select-none outline-none transition-shadow h-full"
+		class="grid gap-0 border-2 border-slate-300 shadow-xl rounded-lg overflow-hidden select-none outline-none transition-shadow h-full"
 		tabindex="-1"
 		role="grid"
+		style="grid-template-columns: repeat({config.boardWidth}, 1fr); grid-template-rows: repeat({config.boardHeight}, 1fr);"
 	>
 		{#each displayBoard as row, r}
 			{#each row as cell, c}
@@ -156,9 +172,14 @@
 							<span
 								class="absolute bottom-0 right-0.5 text-[5px] md:text-[6px] font-bold opacity-70 leading-none pb-0.5"
 							>
-								{LETTER_VALUES[cell.toUpperCase()] || 0}
+								{config.letterValues[cell.toUpperCase()] || 0}
 							</span>
 						</div>
+					{:else if config.boardMultipliers[r][c] === "STP"}
+						<span
+							class="text-slate-400 text-lg md:text-xl drop-shadow-sm select-none"
+							>★</span
+						>
 					{:else}
 						<span class="opacity-30 text-[8px] md:text-[10px]"
 							>{multLabel(r, c)}</span
@@ -171,10 +192,6 @@
 </div>
 
 <style>
-	.grid-cols-15 {
-		grid-template-columns: repeat(15, 1fr);
-		grid-template-rows: repeat(15, 1fr);
-	}
 	.cell {
 		width: 100%;
 		height: 100%;

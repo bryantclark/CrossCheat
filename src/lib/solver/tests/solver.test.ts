@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { solve } from "../index";
 import { bruteForceSolve } from "./bruteForceAlgorithm";
+import { GAMES } from "../games";
 import type { TestDictionary } from "./solverTestHelpers";
 import {
   loadTestDictionary,
@@ -30,78 +31,89 @@ beforeAll(async () => {
 }, 60_000);
 
 // ── Tests ────────────────────────────────────────────────────
-// This test needs to be run whenever changes are made to the solver
-// otherwise keep it skipped because it is slow
-describe.skip("solver correctness: brute force vs optimized", () => {
-  for (let numWords = 2; numWords <= 12; numWords++) {
-    it(
-      `board with ${numWords} words`,
-      async () => {
-        const board = generateBoard(numWords, td.dictionary, td.trie);
-        const bag = makeBag();
-        removeBoardTilesFromBag(board, bag);
+describe("solver correctness: brute force vs optimized", () => {
+  for (const gameName in GAMES) {
+    const config = GAMES[gameName];
 
-        const rack = drawRack(bag);
-
-        console.log(
-          `\n=== Test: ${numWords} words on board, rack: [${rack}] ===`,
-        );
-        console.log(boardToString(board));
-
-        // Run both solvers
-        const optimizedResults = solve(board, rack, td.trie);
-        const bruteResults = bruteForceSolve(
-          board,
-          rack,
-          td.dictionary,
-          td.trie,
-        );
-
-        // The best score must match
-        const bestBrute = bruteResults[0]!.score;
-        const bestOptimized = optimizedResults[0]!.score;
-
-        if (bestBrute !== bestOptimized) {
-          console.log("MISMATCH! Top brute force moves:");
-          for (const m of bruteResults.slice(0, 10)) {
-            console.log(
-              `  ${m.word} (${m.row},${m.col}) ${m.direction} = ${m.score}`,
+    describe(`Game: ${gameName}`, () => {
+      for (let numWords = 2; numWords <= 12; numWords++) {
+        it(
+          `board with ${numWords} words`,
+          async () => {
+            const board = generateBoard(
+              numWords,
+              td.dictionary,
+              td.trie,
+              config,
             );
-          }
-          console.log("Top optimized moves:");
-          for (const m of optimizedResults.slice(0, 10)) {
-            console.log(
-              `  ${m.word} (${m.row},${m.col}) ${m.direction} = ${m.score}`,
+            const bag = makeBag();
+            removeBoardTilesFromBag(board, bag);
+
+            const rack = drawRack(bag);
+
+            // Run both solvers
+            const optimizedResults = solve(board, rack, td.trie, config);
+            const bruteResults = bruteForceSolve(
+              board,
+              rack,
+              td.dictionary,
+              td.trie,
+              config,
             );
-          }
-        }
 
-        expect(bestOptimized).toBe(bestBrute);
+            // The best score must match
+            const bestBrute =
+              bruteResults.length > 0 ? bruteResults[0]!.score : 0;
+            const bestOptimized =
+              optimizedResults.length > 0 ? optimizedResults[0]!.score : 0;
 
-        // All moves at the best score should match between both solvers
-        const bruteTopMoves = new Set(
-          bruteResults.filter((m) => m.score === bestBrute).map(moveKey),
-        );
-        const optimizedTopMoves = new Set(
-          optimizedResults
-            .filter((m) => m.score === bestOptimized)
-            .map(moveKey),
-        );
+            if (bestBrute !== bestOptimized) {
+              console.log("MISMATCH! Top brute force moves:");
+              for (const m of bruteResults.slice(0, 10)) {
+                console.log(
+                  `  ${m.word} (${m.row},${m.col}) ${m.direction} = ${m.score}`,
+                );
+              }
+              console.log("Top optimized moves:");
+              for (const m of optimizedResults.slice(0, 10)) {
+                console.log(
+                  `  ${m.word} (${m.row},${m.col}) ${m.direction} = ${m.score}`,
+                );
+              }
+            }
 
-        for (const key of bruteTopMoves) {
-          if (!optimizedTopMoves.has(key)) {
-            console.log(`Brute force top move missing from optimized: ${key}`);
-          }
-        }
-        for (const key of optimizedTopMoves) {
-          if (!bruteTopMoves.has(key)) {
-            console.log(`Optimized top move missing from brute force: ${key}`);
-          }
-        }
+            expect(bestOptimized).toBe(bestBrute);
 
-        expect(optimizedTopMoves).toEqual(bruteTopMoves);
-      },
-      30 * 60 * 1000,
-    ); // 30 minute timeout
+            // All moves at the best score should match between both solvers
+            const bruteTopMoves = new Set(
+              bruteResults.filter((m) => m.score === bestBrute).map(moveKey),
+            );
+            const optimizedTopMoves = new Set(
+              optimizedResults
+                .filter((m) => m.score === bestOptimized)
+                .map(moveKey),
+            );
+
+            for (const key of bruteTopMoves) {
+              if (!optimizedTopMoves.has(key)) {
+                console.log(
+                  `Brute force top move missing from optimized: ${key}`,
+                );
+              }
+            }
+            for (const key of optimizedTopMoves) {
+              if (!bruteTopMoves.has(key)) {
+                console.log(
+                  `Optimized top move missing from brute force: ${key}`,
+                );
+              }
+            }
+
+            expect(optimizedTopMoves).toEqual(bruteTopMoves);
+          },
+          30 * 60 * 1000,
+        ); // 30 minute timeout
+      }
+    });
   }
 });
