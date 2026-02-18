@@ -166,7 +166,11 @@
 	<div
 		class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-32 lg:pb-0"
 	>
-		<div class="lg:col-span-8 flex flex-col gap-4" in:fade={{ delay: 200 }}>
+		<div
+			class="lg:col-span-8 flex flex-col gap-4"
+			bind:clientHeight={leftColHeight}
+			in:fade={{ delay: 200 }}
+		>
 			<div
 				class="bg-white p-2 md:p-5 rounded-3xl shadow-xl border border-slate-100 relative group overflow-hidden"
 			>
@@ -226,7 +230,11 @@
 			</div>
 		</div>
 
-		<div class="lg:col-span-4 lg:sticky lg:top-6" in:fade={{ delay: 400 }}>
+		<div
+			class="lg:col-span-4 lg:sticky lg:top-6"
+			style="height: {leftColHeight ? `${leftColHeight}px` : 'auto'}"
+			in:fade={{ delay: 400 }}
+		>
 			<Results
 				{results}
 				onHover={handlePreview}
