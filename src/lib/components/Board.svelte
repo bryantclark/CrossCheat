@@ -46,7 +46,12 @@
 		const val = target.value.slice(-1);
 		if (val.match(/[a-z]/i)) {
 			board[focusedCell.r][focusedCell.c] = val.toUpperCase();
-			advanceFocus();
+
+			// Only auto-advance on touch devices (mobile)
+			const isTouch = window.matchMedia("(pointer: coarse)").matches;
+			if (isTouch) {
+				advanceFocus();
+			}
 		}
 		target.value = ""; // Reset for next char
 	}
