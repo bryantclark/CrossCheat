@@ -166,7 +166,11 @@
 </script>
 
 <svelte:head>
-	<title>Solve - CrossCheat</title>
+	<title>Solve {selectedGameKey} Puzzles - CrossCheat</title>
+	<meta
+		name="description"
+		content="Use our high-performance solver to find the best moves for {selectedGameKey}. High-speed move generation using a trie-based algorithm."
+	/>
 </svelte:head>
 
 <div
@@ -217,9 +221,9 @@
 		</div>
 	</header>
 
-	<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+	<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 		<!-- Cool Interactive Toggle Area -->
-		<div class="mb-10 flex flex-col items-center gap-4">
+		<div class="mb-6 flex flex-col items-center gap-4">
 			<div
 				class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400"
 			>
@@ -230,9 +234,9 @@
 
 		<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
 			<!-- Left: Board and Rack (lg:col-span-8) -->
-			<div class="lg:col-span-8 space-y-8" in:fade={{ delay: 200 }}>
+			<div class="lg:col-span-8 space-y-4" in:fade={{ delay: 200 }}>
 				<div
-					class="bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center"
+					class="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center"
 				>
 					<Board bind:board {previewBoard} {config} />
 					<div

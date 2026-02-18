@@ -29,8 +29,12 @@
 			<p
 				class="text-2xl md:text-3xl text-slate-500 font-medium leading-tight"
 			>
-				Crosswords solver for Crossplay or Scrabble. Stop guessing,
-				start <span
+				Crosswords solver for <span class="text-slate-900 font-bold"
+					>Crossplay</span
+				>, <span class="text-slate-900 font-bold">Scrabble</span>, or
+				<span class="text-slate-900 font-bold">Words With Friends</span
+				>. Stop guessing, start
+				<span
 					class="text-slate-900 font-bold underline decoration-orange-500/30"
 					>winning</span
 				>.
@@ -39,7 +43,7 @@
 
 		<!-- Actions -->
 		<div
-			class="flex flex-col sm:flex-row items-center justify-start gap-4 pt-4"
+			class="flex flex-row items-center justify-start gap-4 pt-4"
 			in:fly={{ x: -20, duration: 800, delay: 400 }}
 		>
 			<a
@@ -49,7 +53,7 @@
 				<div
 					class="absolute inset-0 bg-gradient-to-r from-orange-600 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"
 				></div>
-				<span class="relative">Start Solving</span>
+				<span class="relative whitespace-nowrap">Start Solving</span>
 			</a>
 			<button
 				onclick={scrollToDeepDive}

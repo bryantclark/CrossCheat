@@ -86,15 +86,11 @@
 	}
 
 	const MULTIPLIER_STYLES: Record<string, string> = {
-		"3W": "bg-purple-50 border-purple-100 text-purple-400",
-		TW: "bg-purple-50 border-purple-100 text-purple-400",
-		"2W": "bg-blue-50 border-blue-100 text-blue-400",
-		DW: "bg-blue-50 border-blue-100 text-blue-400",
-		"3L": "bg-emerald-50 border-emerald-100 text-emerald-400",
-		TL: "bg-emerald-50 border-emerald-100 text-emerald-400",
-		"2L": "bg-amber-50 border-amber-100 text-amber-500",
-		DL: "bg-amber-50 border-amber-100 text-amber-500",
-		ST: "bg-white border-slate-200 text-slate-400",
+		TWS: "bg-purple-50 border-purple-100 text-purple-400",
+		DWS: "bg-blue-50 border-blue-100 text-blue-400",
+		TLS: "bg-emerald-50 border-emerald-100 text-emerald-400",
+		DLS: "bg-amber-50 border-amber-100 text-amber-500",
+		STP: "bg-white border-slate-200 text-slate-400",
 	};
 
 	function cellClass(r: number, c: number): string {
@@ -113,13 +109,21 @@
 		return char === char.toLowerCase() && char !== " ";
 	}
 
+	const LABEL_MAP: Record<string, string> = {
+		TWS: "3W",
+		DWS: "2W",
+		TLS: "3L",
+		DLS: "2L",
+		STP: "SP",
+	};
+
 	function multLabel(r: number, c: number): string {
 		const mult = config.boardMultipliers[r][c];
-		return mult === "ST" ? "SP" : mult === "  " ? "" : mult;
+		return LABEL_MAP[mult] || "";
 	}
 </script>
 
-<div class="relative w-full max-w-[min(90vw,600px)] aspect-square mx-auto">
+<div class="relative w-full max-w-[min(90vw,540px)] aspect-square mx-auto">
 	<!-- Hidden input for mobile keyboard -->
 	<input
 		bind:this={inputRef}
@@ -171,6 +175,11 @@
 								{config.letterValues[cell.toUpperCase()] || 0}
 							</span>
 						</div>
+					{:else if config.boardMultipliers[r][c] === "STP"}
+						<span
+							class="text-slate-400 text-lg md:text-xl drop-shadow-sm select-none"
+							>★</span
+						>
 					{:else}
 						<span class="opacity-30 text-[8px] md:text-[10px]"
 							>{multLabel(r, c)}</span

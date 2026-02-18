@@ -1,10 +1,19 @@
 <script lang="ts">
     import { GAMES } from "$lib/solver/games";
+    import { onMount } from "svelte";
 
     let { selectedGameKey = $bindable() }: { selectedGameKey: string } =
         $props();
 
     const games = Object.keys(GAMES);
+    let buttonElements = $state<HTMLElement[]>([]);
+
+    let highlightStyle = $derived.by(() => {
+        const index = games.indexOf(selectedGameKey);
+        const el = buttonElements[index];
+        if (!el) return "";
+        return `width: ${el.offsetWidth}px; transform: translateX(${el.offsetLeft}px);`;
+    });
 </script>
 
 <div
@@ -12,14 +21,13 @@
 >
     <!-- Sliding Highlight -->
     <div
-        class="absolute top-1 bottom-1 left-1 bg-white rounded-xl shadow-md transition-all duration-300 ease-out z-0"
-        style="width: calc((100% - 8px) / {games.length}); transform: translateX(calc({games.indexOf(
-            selectedGameKey,
-        )} * 100%));"
+        class="absolute top-1 bottom-1 left-0 bg-white rounded-xl shadow-md transition-all duration-300 ease-out z-0"
+        style={highlightStyle}
     ></div>
 
-    {#each games as game}
+    {#each games as game, i}
         <button
+            bind:this={buttonElements[i]}
             onclick={() => (selectedGameKey = game)}
             data-testid="game-toggle-{game}"
             class="relative z-10 px-6 py-2.5 text-xs font-black uppercase tracking-widest transition-colors duration-300 {selectedGameKey ===

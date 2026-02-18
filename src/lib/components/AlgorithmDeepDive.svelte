@@ -300,10 +300,10 @@
         <div
           class="inline-flex bg-slate-200/50 p-1 rounded-2xl border border-slate-200 backdrop-blur-sm"
         >
-          {#each ["CrossPlay", "Scrabble"] as game}
+          {#each ["CrossPlay", "Scrabble", "Words With Friends"] as game}
             <button
               onclick={() => (selectedGame = game)}
-              class="px-6 py-2 text-sm font-black rounded-xl transition-all {selectedGame ===
+              class="px-4 py-2 text-xs md:text-sm font-black rounded-xl transition-all {selectedGame ===
               game
                 ? 'bg-white text-orange-600 shadow-md transform scale-105'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}"
@@ -319,14 +319,18 @@
           <a
             href={selectedGame === "CrossPlay"
               ? "https://help.nytimes.com/360011158491-New-York-Times-Games/crossplay-app"
-              : "https://www.scrabblepages.com/scrabble/rules/"}
+              : selectedGame === "Scrabble"
+                ? "https://www.scrabblepages.com/scrabble/rules/"
+                : "https://zyngasupport.helpshift.com/hc/en/63-words-with-friends-2/faq/10552-words-with-friends-rule-book/"}
             target="_blank"
             rel="noopener noreferrer"
             class="font-bold text-slate-900 underline decoration-orange-500/30 hover:decoration-orange-500 transition-all"
           >
             {selectedGame === "CrossPlay"
               ? "NYT Crossplay"
-              : "Official Scrabble"}
+              : selectedGame === "Scrabble"
+                ? "Official Scrabble"
+                : "Words With Friends"}
           </a>.
         </p>
       </div>
@@ -350,11 +354,16 @@
                   We prioritize <strong>Triple Word</strong> and
                   <strong>Double Word</strong> bonuses. A short word on a triple
                   score often beats a long word on an empty board.
-                {:else}
+                {:else if selectedGame === "Scrabble"}
                   Scrabble uses higher board multipliers. We focus on hitting
                   <strong>Triple Word (TW)</strong> and
                   <strong>Triple Letter (TL)</strong>
                   spots for maximum impact.
+                {:else}
+                  WWF features a high density of <strong
+                    >Double Multipliers</strong
+                  >. The decentralized layout means you can often chain multiple
+                  bonus squares in a single move.
                 {/if}
               </p>
             </div>
@@ -378,11 +387,16 @@
                     >40-point bonus</strong
                   >. This is the "Golden Snitch" of the game—it almost always
                   guarantees a top ranking.
-                {:else}
+                {:else if selectedGame === "Scrabble"}
                   In Scrabble, using all 7 tiles awards a massive <strong
                     >50-point bonus</strong
                   >. It's harder to achieve but more rewarding than in
                   CrossPlay.
+                {:else}
+                  WWF rewards all-tile plays with a <strong
+                    >35-point bonus</strong
+                  >. While smaller, the more generous board layout makes these
+                  long words easier to find.
                 {/if}
               </p>
             </div>
@@ -400,18 +414,24 @@
               <h4 class="mb-3 text-2xl font-black text-slate-900">
                 {#if selectedGame === "CrossPlay"}
                   Parallel Play
-                {:else}
+                {:else if selectedGame === "Scrabble"}
                   Tile Strategy
+                {:else}
+                  Letter Efficiency
                 {/if}
               </h4>
               <p class="text-slate-600 leading-relaxed font-medium">
                 {#if selectedGame === "CrossPlay"}
                   We sum points for every word formed. Placing an 'S' to
                   pluralize a word while creating a new one counts for both.
+                {:else if selectedGame === "Scrabble"}
+                  Scrabble has a pool of <strong>100 tiles</strong>. We
+                  prioritize preserving high-value letters unless the board
+                  position is too good to pass up.
                 {:else}
-                  Scrabble has a pool of <strong>100 tiles</strong> with different
-                  counts. We prioritize preserving high-value letters unless the
-                  board position is too good to pass up.
+                  With different letter values (like <strong>J=10</strong>), the
+                  goal in WWF is often to land high-value tiles on multiplier
+                  spots before your opponent can.
                 {/if}
               </p>
             </div>
