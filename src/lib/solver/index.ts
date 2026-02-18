@@ -1,180 +1,189 @@
 import { Trie, type TrieNode } from "./trie";
 import { scoreMove, type Move, type Direction } from "./scorer";
+import type { GameConfig } from "./games";
 
 export function computeCrossSets(
   board: string[][],
   trie: Trie,
   direction: Direction,
+  config: GameConfig,
 ): Set<string>[][] {
-  const result: Set<string>[][] = Array(15)
+  const { boardWidth, boardHeight } = config;
+  const result: Set<string>[][] = Array(boardHeight)
     .fill(null)
     .map(() =>
-      Array(15)
+      Array(boardWidth)
         .fill(null)
         .map(() => new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
     );
 
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) {
+  const deltaRow = direction === "H" ? 1 : 0;
+  const deltaCol = direction === "V" ? 1 : 0;
+
+  for (let r = 0; r < boardHeight; r++) {
+    for (let c = 0; c < boardWidth; c++) {
       if (board[r][c] !== " ") continue;
 
-      const perp: Direction = direction === "H" ? "V" : "H";
-      const dr = perp === "V" ? 1 : 0;
-      const dc = perp === "H" ? 1 : 0;
-
-      const n1r = r - dr;
-      const n1c = c - dc;
-      const n2r = r + dr;
-      const n2c = c + dc;
+      const n1r = r - deltaRow;
+      const n1c = c - deltaCol;
+      const n2r = r + deltaRow;
+      const n2c = c + deltaCol;
 
       const hasNeighbor =
         (n1r >= 0 &&
-          n1r < 15 &&
+          n1r < boardHeight &&
           n1c >= 0 &&
-          n1c < 15 &&
+          n1c < boardWidth &&
           board[n1r][n1c] !== " ") ||
         (n2r >= 0 &&
-          n2r < 15 &&
+          n2r < boardHeight &&
           n2c >= 0 &&
-          n2c < 15 &&
+          n2c < boardWidth &&
           board[n2r][n2c] !== " ");
 
       if (hasNeighbor) {
-        let tr = r;
-        let tc = c;
+        let currentPrefixRow = r - deltaRow;
+        let currentPrefixCol = c - deltaCol;
+        let prefix = "";
         while (
-          tr - dr >= 0 &&
-          tc - dc >= 0 &&
-          board[tr - dr][tc - dc] !== " "
+          currentPrefixRow >= 0 &&
+          currentPrefixCol >= 0 &&
+          board[currentPrefixRow][currentPrefixCol] !== " "
         ) {
-          tr -= dr;
-          tc -= dc;
+          prefix = board[currentPrefixRow][currentPrefixCol] + prefix;
+          currentPrefixRow -= deltaRow;
+          currentPrefixCol -= deltaCol;
         }
 
-        let prefix = "";
-        let cr = tr;
-        let cc = tc;
-        while (
-          cr >= 0 &&
-          cr < 15 &&
-          cc >= 0 &&
-          cc < 15 &&
-          board[cr][cc] !== " " &&
-          (cr !== r || cc !== c)
-        ) {
-          prefix += board[cr][cc];
-          cr += dr;
-          cc += dc;
-        }
-        cr = r + dr;
-        cc = c + dc;
+        let currentSuffixRow = r + deltaRow;
+        let currentSuffixCol = c + deltaCol;
         let suffix = "";
         while (
-          cr >= 0 &&
-          cr < 15 &&
-          cc >= 0 &&
-          cc < 15 &&
-          board[cr][cc] !== " "
+          currentSuffixRow < boardHeight &&
+          currentSuffixCol < boardWidth &&
+          board[currentSuffixRow][currentSuffixCol] !== " "
         ) {
-          suffix += board[cr][cc];
-          cr += dr;
-          cc += dc;
+          suffix += board[currentSuffixRow][currentSuffixCol];
+          currentSuffixRow += deltaRow;
+          currentSuffixCol += deltaCol;
         }
 
-        const valid = new Set<string>();
+        const validChars = new Set<string>();
         for (const char of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
           if (trie.contains(prefix + char + suffix)) {
-            valid.add(char);
+            validChars.add(char);
           }
         }
-        result[r][c] = valid;
+        result[r][c] = validChars;
       }
     }
   }
   return result;
 }
 
-export function solve(board: string[][], rackStr: string, trie: Trie): Move[] {
+export function solve(
+  board: string[][],
+  rackStr: string,
+  trie: Trie,
+  config: GameConfig,
+): Move[] {
   const rack = rackStr.toUpperCase().replace(/\?/g, " ").split("");
   const hasTiles = board.some((row) => row.some((cell) => cell !== " "));
 
-  const hOk = computeCrossSets(board, trie, "H");
-  const vOk = computeCrossSets(board, trie, "V");
+  const { boardWidth, boardHeight, centerSquare } = config;
+
+  const hOk = computeCrossSets(board, trie, "H", config);
+  const vOk = computeCrossSets(board, trie, "V", config);
 
   const results: Move[] = [];
   const seen = new Set<string>();
 
-  const scan = (d: Direction) => {
-    const cross = d === "H" ? hOk : vOk;
+  const scan = (direction: Direction) => {
+    const crossSets = direction === "H" ? hOk : vOk;
+    const lineLength = direction === "H" ? boardWidth : boardHeight;
+    const numLines = direction === "H" ? boardHeight : boardWidth;
 
-    for (let line = 0; line < 15; line++) {
-      const cells = d === "H" ? board[line] : board.map((row) => row[line]);
+    for (let lineIdx = 0; lineIdx < numLines; lineIdx++) {
+      const lineCells =
+        direction === "H" ? board[lineIdx] : board.map((row) => row[lineIdx]);
 
-      const touches = new Set<number>();
-      for (let i = 0; i < 15; i++) {
-        const r = d === "H" ? line : i;
-        const c = d === "H" ? i : line;
+      const anchorPoints = new Set<number>();
+      for (let i = 0; i < lineLength; i++) {
+        const r = direction === "H" ? lineIdx : i;
+        const c = direction === "H" ? i : lineIdx;
         if (board[r][c] !== " ") {
-          touches.add(i);
-          if (i > 0 && cells[i - 1] === " ") touches.add(i - 1);
-          if (i < 14 && cells[i + 1] === " ") touches.add(i + 1);
+          anchorPoints.add(i);
+          if (i > 0 && lineCells[i - 1] === " ") anchorPoints.add(i - 1);
+          if (i < lineLength - 1 && lineCells[i + 1] === " ")
+            anchorPoints.add(i + 1);
         } else {
-          const pr2 = d === "H" ? 1 : 0;
-          const pc2 = d === "H" ? 0 : 1;
+          const perpDirR = direction === "H" ? 1 : 0;
+          const perpDirC = direction === "H" ? 0 : 1;
           if (
-            (r - pr2 >= 0 &&
-              r - pr2 < 15 &&
-              c - pc2 >= 0 &&
-              c - pc2 < 15 &&
-              board[r - pr2][c - pc2] !== " ") ||
-            (r + pr2 >= 0 &&
-              r + pr2 < 15 &&
-              c + pc2 >= 0 &&
-              c + pc2 < 15 &&
-              board[r + pr2][c + pc2] !== " ")
+            (r - perpDirR >= 0 &&
+              r - perpDirR < boardHeight &&
+              c - perpDirC >= 0 &&
+              c - perpDirC < boardWidth &&
+              board[r - perpDirR][c - perpDirC] !== " ") ||
+            (r + perpDirR >= 0 &&
+              r + perpDirR < boardHeight &&
+              c + perpDirC >= 0 &&
+              c + perpDirC < boardWidth &&
+              board[r + perpDirR][c + perpDirC] !== " ")
           ) {
-            touches.add(i);
+            anchorPoints.add(i);
           }
         }
       }
-      if (!hasTiles) touches.add(7);
-      if (touches.size === 0) continue;
+      if (!hasTiles) {
+        const lineIsCenter =
+          direction === "H"
+            ? lineIdx === centerSquare[0]
+            : lineIdx === centerSquare[1];
+        if (lineIsCenter) {
+          anchorPoints.add(
+            direction === "H" ? centerSquare[1] : centerSquare[0],
+          );
+        }
+      }
+      if (anchorPoints.size === 0) continue;
 
-      const minT = Math.min(...touches);
-      const maxT = Math.max(...touches);
+      const minAnchor = Math.min(...anchorPoints);
+      const maxAnchor = Math.max(...anchorPoints);
 
       const walk = (
         pos: number,
         node: TrieNode,
-        word: string[],
-        tiles: string[],
-        placed: number,
+        currentWord: string[],
+        remainingTiles: string[],
+        tilesPlaced: number,
       ) => {
-        if (node.isTerminal && placed > 0 && word.length >= 2) {
-          if (pos > 14 || cells[pos] === " ") {
-            const start = pos - word.length;
-            const r = d === "H" ? line : start;
-            const c = d === "H" ? start : line;
-            const wordStr = word.join("");
-            const key = `${wordStr}-${r}-${c}-${d}`;
+        if (node.isTerminal && tilesPlaced > 0 && currentWord.length >= 2) {
+          if (pos >= lineLength || lineCells[pos] === " ") {
+            const startPos = pos - currentWord.length;
+            const row = direction === "H" ? lineIdx : startPos;
+            const col = direction === "H" ? startPos : lineIdx;
+            const wordStr = currentWord.join("");
+            const key = `${wordStr}-${row}-${col}-${direction}`;
             if (!seen.has(key)) {
               seen.add(key);
               const score = scoreMove(
                 board,
                 wordStr,
-                r,
-                c,
-                d,
+                row,
+                col,
+                direction,
                 rack,
                 trie,
+                config,
                 !hasTiles,
               );
               if (score !== null) {
                 results.push({
                   word: wordStr,
-                  row: r,
-                  col: c,
-                  direction: d,
+                  row,
+                  col,
+                  direction,
                   score,
                 });
               }
@@ -182,61 +191,83 @@ export function solve(board: string[][], rackStr: string, trie: Trie): Move[] {
           }
         }
 
-        if (pos > 14) return;
+        if (pos >= lineLength) return;
 
-        if (cells[pos] !== " ") {
-          const char = cells[pos];
+        if (lineCells[pos] !== " ") {
+          const char = lineCells[pos];
           if (node.children[char]) {
-            word.push(char);
-            walk(pos + 1, node.children[char], word, tiles, placed);
-            word.pop();
+            currentWord.push(char);
+            walk(
+              pos + 1,
+              node.children[char],
+              currentWord,
+              remainingTiles,
+              tilesPlaced,
+            );
+            currentWord.pop();
           }
         } else {
-          if (placed === 0 && pos > maxT + tiles.length) return;
+          if (tilesPlaced === 0 && pos > maxAnchor + remainingTiles.length)
+            return;
 
-          const r = d === "H" ? line : pos;
-          const c = d === "H" ? pos : line;
-          const allowed = cross[r][c];
-          const tried = new Set<string>();
+          const r = direction === "H" ? lineIdx : pos;
+          const c = direction === "H" ? pos : lineIdx;
+          const allowedChars = crossSets[r][c];
+          const triedInThisPos = new Set<string>();
 
-          // Pass 1: regular tiles — using a real tile is always
-          // preferable because it keeps blanks free for later.
-          for (let i = 0; i < tiles.length; i++) {
-            const t = tiles[i];
-            if (t === " ") continue;
-            if (tried.has(t)) continue;
-            tried.add(t);
-            if (node.children[t] && allowed.has(t)) {
-              const rest = [...tiles.slice(0, i), ...tiles.slice(i + 1)];
-              word.push(t);
-              walk(pos + 1, node.children[t], word, rest, placed + 1);
-              word.pop();
+          for (let i = 0; i < remainingTiles.length; i++) {
+            const tile = remainingTiles[i];
+            if (tile === " ") continue;
+            if (triedInThisPos.has(tile)) continue;
+            triedInThisPos.add(tile);
+            if (node.children[tile] && allowedChars.has(tile)) {
+              const nextTiles = [
+                ...remainingTiles.slice(0, i),
+                ...remainingTiles.slice(i + 1),
+              ];
+              currentWord.push(tile);
+              walk(
+                pos + 1,
+                node.children[tile],
+                currentWord,
+                nextTiles,
+                tilesPlaced + 1,
+              );
+              currentWord.pop();
             }
           }
 
-          // Pass 2: one blank — try only letters not already
-          // covered by a regular tile (those paths already
-          // explored above with the blank still in rest).
-          // Only one blank needs processing per position:
-          // duplicate blanks produce identical rest arrays.
-          for (let i = 0; i < tiles.length; i++) {
-            if (tiles[i] !== " ") continue;
-            const rest = [...tiles.slice(0, i), ...tiles.slice(i + 1)];
+          for (let i = 0; i < remainingTiles.length; i++) {
+            if (remainingTiles[i] !== " ") continue;
+            const nextTiles = [
+              ...remainingTiles.slice(0, i),
+              ...remainingTiles.slice(i + 1),
+            ];
             for (const char in node.children) {
-              if (allowed.has(char) && !tried.has(char)) {
-                word.push(char);
-                walk(pos + 1, node.children[char], word, rest, placed + 1);
-                word.pop();
+              if (allowedChars.has(char) && !triedInThisPos.has(char)) {
+                currentWord.push(char);
+                walk(
+                  pos + 1,
+                  node.children[char],
+                  currentWord,
+                  nextTiles,
+                  tilesPlaced + 1,
+                );
+                currentWord.pop();
               }
             }
-            break; // all blanks are interchangeable at this position
+            break;
           }
         }
       };
 
-      const earliest = Math.max(0, minT - rack.length);
-      for (let start = earliest; start <= Math.min(maxT, 14); start++) {
-        if (start > 0 && cells[start - 1] !== " ") continue;
+      const earliestStart = Math.max(0, minAnchor - rack.length);
+      for (
+        let start = earliestStart;
+        start <= Math.min(maxAnchor, lineLength - 1);
+        start++
+      ) {
+        if (start > 0 && lineCells[start - 1] !== " ") continue;
         walk(start, trie.root, [], rack, 0);
       }
     }

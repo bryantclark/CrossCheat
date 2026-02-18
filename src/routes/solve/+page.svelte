@@ -1,258 +1,274 @@
 <script lang="ts">
+	import { onMount, tick } from "svelte";
+	import { fade } from "svelte/transition";
+	import { Trie } from "$lib/solver/trie";
+	import { solve } from "$lib/solver";
+	import type { Move } from "$lib/solver/scorer";
+	import { GAMES } from "$lib/solver/games";
 	import Board from "$lib/components/Board.svelte";
 	import Rack from "$lib/components/Rack.svelte";
-	import Results from "$lib/components/Results.svelte";
-	import { solve } from "$lib/solver";
-	import { loadDictionary } from "$lib/solver/dictionary";
-	import type { Move } from "$lib/solver/scorer";
-	import type { Trie } from "$lib/solver/trie";
-	import { onMount } from "svelte";
-	import { fade, fly } from "svelte/transition";
+	import BestMoves from "$lib/components/BestMoves.svelte";
+	import GameToggle from "$lib/components/GameToggle.svelte";
 
-	let board: string[][] = $state(
+	// State
+	let selectedGameKey = $state("CrossPlay");
+	let config = $derived(GAMES[selectedGameKey] || GAMES["CrossPlay"]);
+
+	let board = $state(
 		Array(15)
 			.fill(null)
 			.map(() => Array(15).fill(" ")),
 	);
 	let rack = $state("");
-	let trie: Trie | null = $state(null);
-	let results: Move[] = $state([]);
-	let loading = $state(true);
-	let solving = $state(false);
-	let previewMove: Move | null = $state(null);
-	let leftColHeight = $state(0);
-	let initialized = $state(false);
+	let results = $state<Move[]>([]);
+	let trie = $state<Trie | null>(null);
+	let isSolving = $state(false);
+	let previewMove = $state<Move | undefined>(undefined);
 
-	// Derived state
-	let isPreviewing = $derived(!!previewMove);
-	let previewBoard = $derived(
-		isPreviewing ? computePreview(board, previewMove!) : board,
-	);
-
-	// Load dictionary + restore localStorage
+	// Persistence & Initialization
 	onMount(async () => {
+		// Load dictionary
 		try {
-			const savedBoard = localStorage.getItem("crosscheat_board");
-			const savedRack = localStorage.getItem("crosscheat_rack");
-			if (savedBoard) board = JSON.parse(savedBoard);
-			if (savedRack) rack = savedRack;
-		} catch (_) {}
-		initialized = true;
+			const resp = await fetch(
+				"https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt",
+			);
+			const text = await resp.text();
+			const words = text
+				.split("\n")
+				.map((w) => w.trim().toUpperCase())
+				.filter(Boolean);
+			const t = new Trie();
+			words.forEach((w) => t.insert(w));
+			trie = t;
+		} catch (e) {
+			console.error("Failed to load dictionary", e);
+		}
 
-		trie = await loadDictionary();
-		loading = false;
+		// Load saved state
+		const savedGame = localStorage.getItem("selectedGame");
+		if (savedGame && GAMES[savedGame]) {
+			selectedGameKey = savedGame;
+		}
+
+		const savedBoard = localStorage.getItem(`board_${selectedGameKey}`);
+		if (savedBoard) {
+			try {
+				const parsed = JSON.parse(savedBoard);
+				if (
+					Array.isArray(parsed) &&
+					parsed.length === config.boardHeight &&
+					parsed[0].length === config.boardWidth
+				) {
+					board = parsed;
+				}
+			} catch (e) {
+				console.error("Failed to parse saved board", e);
+			}
+		}
+
+		const savedRack = localStorage.getItem(`rack_${selectedGameKey}`);
+		if (savedRack) rack = savedRack;
 	});
 
-	// Persist to localStorage
 	$effect(() => {
-		if (!initialized) return;
-		localStorage.setItem("crosscheat_board", JSON.stringify(board));
-		localStorage.setItem("crosscheat_rack", rack);
-	});
-
-	// Auto-solve with debounce — reacts to board AND rack changes
-	let solveTimer: ReturnType<typeof setTimeout> | undefined;
-	$effect(() => {
-		// Read both board and rack so Svelte tracks them as dependencies
-		const _boardSnapshot = JSON.stringify(board);
-		const _rackSnapshot = rack;
-		if (trie) {
-			clearTimeout(solveTimer);
-			solveTimer = setTimeout(handleSolve, 300);
+		if (selectedGameKey) {
+			localStorage.setItem("selectedGame", selectedGameKey);
+			// Reset board if dimensions change
+			if (
+				board.length !== config.boardHeight ||
+				board[0].length !== config.boardWidth
+			) {
+				board = Array(config.boardHeight)
+					.fill(null)
+					.map(() => Array(config.boardWidth).fill(" "));
+			}
 		}
 	});
 
-	function handleSolve() {
-		if (!trie) return;
-		if (!rack) {
+	$effect(() => {
+		localStorage.setItem(`board_${selectedGameKey}`, JSON.stringify(board));
+	});
+
+	$effect(() => {
+		localStorage.setItem(`rack_${selectedGameKey}`, rack);
+	});
+
+	// Actions
+	async function doSolve() {
+		if (!trie || !rack) {
 			results = [];
 			return;
 		}
-		solving = true;
-		results = solve(board, rack, trie).slice(0, 10);
-		solving = false;
-	}
-
-	function handlePreview(move: Move | null) {
-		previewMove = move;
-	}
-
-	function handleSelect(move: Move) {
-		const { word, row, col, direction } = move;
-		for (let i = 0; i < word.length; i++) {
-			const r = direction === "V" ? row + i : row;
-			const c = direction === "H" ? col + i : col;
-			board[r][c] = word[i];
+		isSolving = true;
+		await tick();
+		try {
+			const allResults = solve(board, rack, trie, config);
+			results = allResults.slice(0, 10);
+		} catch (e) {
+			console.error("Solve failed", e);
+		} finally {
+			isSolving = false;
 		}
-		board = [...board];
+	}
+
+	// Auto-solve with debounce
+	let solveTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		// These variables are accessed to ensure the effect re-runs when they change
+		const _boardSnapshot = JSON.stringify(board);
+		const _rackSnapshot = rack;
+		const _gameSnapshot = selectedGameKey;
+		if (trie) {
+			clearTimeout(solveTimer);
+			solveTimer = setTimeout(doSolve, 300);
+		}
+	});
+
+	function applyMove(move: Move) {
+		const newBoard = board.map((row) => [...row]);
+		for (let i = 0; i < move.word.length; i++) {
+			const r = move.direction === "V" ? move.row + i : move.row;
+			const c = move.direction === "H" ? move.col + i : move.col;
+			newBoard[r][c] = move.word[i];
+		}
+		board = newBoard;
+		previewMove = undefined;
+
+		// In a real app we'd auto-deduct from rack here, but keeping it simple for now
+		doSolve();
+	}
+
+	function handleReset() {
+		board = Array(config.boardHeight)
+			.fill(null)
+			.map(() => Array(config.boardWidth).fill(" "));
 		results = [];
-		previewMove = null;
+		previewMove = undefined;
 		rack = "";
 	}
 
-	function computePreview(baseBoard: string[][], move: Move): string[][] {
-		const temp = baseBoard.map((row) => [...row]);
-		const { word, row, col, direction } = move;
-		for (let i = 0; i < word.length; i++) {
-			const r = direction === "V" ? row + i : row;
-			const c = direction === "H" ? col + i : col;
-			if (temp[r][c] === " ") {
-				temp[r][c] = word[i].toLowerCase();
-			}
+	let previewBoard = $derived.by(() => {
+		if (!previewMove) return undefined;
+		const nb = board.map((row) => [...row]);
+		for (let i = 0; i < previewMove.word.length; i++) {
+			const r =
+				previewMove.direction === "V"
+					? previewMove.row + i
+					: previewMove.row;
+			const c =
+				previewMove.direction === "H"
+					? previewMove.col + i
+					: previewMove.col;
+			if (nb[r][c] === " ") nb[r][c] = previewMove.word[i].toLowerCase();
 		}
-		return temp;
-	}
-
-	function clearBoard() {
-		for (let r = 0; r < 15; r++) {
-			for (let c = 0; c < 15; c++) {
-				board[r][c] = " ";
-			}
-		}
-		rack = "";
-		results = [];
-		previewMove = null;
-	}
+		return nb;
+	});
 </script>
 
 <svelte:head>
-	<title>CrossCheat Solver</title>
+	<title>Solve - CrossCheat</title>
 </svelte:head>
 
-<main
-	class="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 lg:p-6 flex flex-col items-center"
-	in:fade={{ duration: 600 }}
+<div
+	class="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden"
 >
+	<!-- Top Bar -->
 	<header
-		class="w-full max-w-7xl mb-6 flex items-center justify-between"
-		in:fly={{ y: -20, duration: 800 }}
+		class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md bg-white/80"
 	>
-		<div class="flex items-center gap-3">
-			<a
-				href="/"
-				class="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-700 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg hover:scale-105 transition-transform"
-			>
-				CC
-			</a>
-			<h1 class="text-3xl font-black tracking-tight text-slate-900">
-				Cross<span class="text-orange-600">Cheat</span>
-			</h1>
-		</div>
-		<div class="flex gap-4">
-			{#if loading}
-				<div class="flex items-center gap-2 text-slate-500">
-					<div
-						class="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"
-					></div>
-					<span class="text-xs font-bold uppercase tracking-widest"
-						>Loading…</span
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="flex items-center justify-between h-16">
+				<div class="flex items-center gap-2">
+					<a
+						href="/"
+						data-testid="header-logo"
+						class="text-2xl font-black text-orange-600 tracking-tighter hover:scale-105 transition-transform"
+						>CROSSCHEAT</a
 					>
 				</div>
-			{:else}
-				<div
-					class="px-4 py-2 bg-white rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 shadow-sm"
-				>
-					<div
-						class="w-2 h-2 rounded-full {solving
-							? 'bg-amber-400 animate-pulse'
-							: 'bg-emerald-400'}"
-					></div>
-					{solving ? "Solving" : "Ready"}
+
+				<div class="flex items-center gap-6">
+					{#if isSolving}
+						<div
+							data-testid="solving-indicator"
+							class="flex items-center gap-2 text-slate-400"
+							in:fade
+						>
+							<div
+								class="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"
+							></div>
+							<span
+								class="text-[10px] font-black uppercase tracking-widest"
+								>Solving</span
+							>
+						</div>
+					{/if}
+					{#if trie}
+						<div data-testid="trie-loaded" class="hidden"></div>
+					{/if}
+					<button
+						onclick={handleReset}
+						class="text-xs font-bold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 hover:bg-red-50"
+					>
+						CLEAR BOARD
+					</button>
 				</div>
-			{/if}
+			</div>
 		</div>
 	</header>
 
-	<div
-		class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-32 lg:pb-0"
-	>
-		<div
-			class="lg:col-span-8 flex flex-col gap-4"
-			bind:clientHeight={leftColHeight}
-			in:fade={{ delay: 200 }}
-		>
+	<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+		<!-- Cool Interactive Toggle Area -->
+		<div class="mb-10 flex flex-col items-center gap-4">
 			<div
-				class="bg-white p-2 md:p-5 rounded-3xl shadow-xl border border-slate-100 relative group overflow-hidden"
+				class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400"
 			>
-				<div
-					class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none hidden md:block"
-				>
-					<svg
-						class="w-32 h-32"
-						fill="currentColor"
-						viewBox="0 0 20 20"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-				</div>
-				<div
-					class="flex items-center justify-between mb-2 px-2 md:px-0"
-				>
-					<h3
-						class="text-base md:text-lg font-bold text-slate-800 flex items-center gap-2"
-					>
-						<span class="w-1.5 h-5 bg-orange-500 rounded-full"
-						></span>
-						Game Board
-					</h3>
-					<button
-						onclick={clearBoard}
-						class="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-slate-200 px-2 py-1 rounded relative z-10 bg-white"
-					>
-						Clear
-					</button>
-				</div>
-
-				<div class="justify-center flex overflow-hidden">
-					<Board
-						bind:board
-						previewBoard={isPreviewing ? previewBoard : undefined}
-					/>
-				</div>
-
-				<div
-					class="mt-4 flex justify-between items-center text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2 md:px-0"
-				>
-					<span class="hidden md:inline"
-						>Use arrow keys to navigate</span
-					>
-					<span class="md:hidden">Tap cell to focus</span>
-					<span>Type letters to place</span>
-				</div>
+				Select Game Multiplier Rules
 			</div>
-
-			<div class="hidden lg:block">
-				<Rack bind:rack />
-			</div>
+			<GameToggle bind:selectedGameKey />
 		</div>
 
-		<div
-			class="lg:col-span-4 lg:sticky lg:top-6"
-			style="height: {leftColHeight ? `${leftColHeight}px` : 'auto'}"
-			in:fade={{ delay: 400 }}
-		>
-			<Results
-				{results}
-				onHover={handlePreview}
-				onSelect={handleSelect}
-			/>
-		</div>
-	</div>
+		<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
+			<!-- Left: Board and Rack (lg:col-span-8) -->
+			<div class="lg:col-span-8 space-y-8" in:fade={{ delay: 200 }}>
+				<div
+					class="bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center"
+				>
+					<Board bind:board {previewBoard} {config} />
+					<div
+						class="mt-4 flex justify-between w-full max-w-lg text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2"
+					>
+						<span>Use arrow keys to navigate</span>
+						<span>Type letters to place</span>
+					</div>
+				</div>
 
-	<!-- Mobile Sticky Rack -->
-	<div
-		class="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-slate-50/80 backdrop-blur-xl border-t border-slate-200 z-50 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]"
-	>
-		<Rack bind:rack />
-	</div>
+				<Rack bind:rack {config} />
+			</div>
+
+			<!-- Right: Best Moves (lg:col-span-4) -->
+			<div
+				class="lg:col-span-4 lg:sticky lg:top-24 h-full"
+				in:fade={{ delay: 400 }}
+			>
+				<BestMoves
+					{results}
+					onSelect={applyMove}
+					onHover={(m: Move | null) => (previewMove = m ?? undefined)}
+				/>
+			</div>
+		</div>
+	</main>
 
 	<footer
-		class="mt-12 text-slate-400 text-xs font-medium uppercase tracking-[0.2em] pb-8"
+		class="py-12 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em] border-t border-slate-100 mt-20"
 	>
-		© 2026 crosscheat • naspa nwl23 dictionary
+		© 2026 crosscheat • powered by enable1 dictionary
 	</footer>
-</main>
+</div>
+
+<style>
+	:global(body) {
+		background-color: #f8fafc;
+	}
+</style>

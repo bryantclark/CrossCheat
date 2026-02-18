@@ -1,28 +1,12 @@
-/**
- * Brute-force Scrabble solver — direct port of the Python reference solver.
- * Used exclusively for testing correctness of the optimized solver.
- *
- * This is intentionally slow: it iterates every dictionary word against every
- * anchor square. Do NOT use in production.
- */
-
-import { LETTER_VALUES, BOARD_MULT } from "../constants";
 import type { Direction, Move } from "../scorer";
 import type { Trie } from "../trie";
+import type { GameConfig } from "../games";
+import { applyMultiplier as mainApplyMultiplier } from "../scorer";
 
 // ── Helpers ───────────────────────────────────────────────────
 
 function rc(r: number, c: number, i: number, d: Direction): [number, number] {
   return d === "V" ? [r + i, c] : [r, c + i];
-}
-
-function applyMult(baseVal: number, multCode: string): [number, number] {
-  const m = multCode.trim();
-  if (m === "2L" || m === "DL") return [baseVal * 2, 1];
-  if (m === "3L" || m === "TL") return [baseVal * 3, 1];
-  if (m === "2W" || m === "DW") return [baseVal, 2];
-  if (m === "3W" || m === "TW") return [baseVal, 3];
-  return [baseVal, 1];
 }
 
 function crossWordScore(
@@ -33,7 +17,9 @@ function crossWordScore(
   mainDir: Direction,
   isBlank: boolean,
   trie: Trie,
+  config: GameConfig,
 ): number {
+  const { letterValues, boardMultipliers, boardWidth, boardHeight } = config;
   const dr = mainDir === "V" ? 0 : 1;
   const dc = mainDir === "V" ? 1 : 0;
 
@@ -42,8 +28,16 @@ function crossWordScore(
   const r2 = r + dr,
     c2 = c + dc;
   const hasNeighbor =
-    (r1 >= 0 && r1 < 15 && c1 >= 0 && c1 < 15 && board[r1][c1] !== " ") ||
-    (r2 >= 0 && r2 < 15 && c2 >= 0 && c2 < 15 && board[r2][c2] !== " ");
+    (r1 >= 0 &&
+      r1 < boardHeight &&
+      c1 >= 0 &&
+      c1 < boardWidth &&
+      board[r1][c1] !== " ") ||
+    (r2 >= 0 &&
+      r2 < boardHeight &&
+      c2 >= 0 &&
+      c2 < boardWidth &&
+      board[r2][c2] !== " ");
   if (!hasNeighbor) return 0;
 
   // Walk back to start of perpendicular word
@@ -62,20 +56,23 @@ function crossWordScore(
 
   while (
     cr >= 0 &&
-    cr < 15 &&
+    cr < boardHeight &&
     cc >= 0 &&
-    cc < 15 &&
+    cc < boardWidth &&
     (board[cr][cc] !== " " || (cr === r && cc === c))
   ) {
     const ch = cr === r && cc === c ? char : board[cr][cc];
     let val: number;
     if (cr === r && cc === c) {
-      val = isBlank ? 0 : (LETTER_VALUES[ch] ?? 0);
-      const [adjVal, wm] = applyMult(val, BOARD_MULT[r][c]);
+      val = isBlank ? 0 : (letterValues[ch] ?? 0);
+      const { val: adjVal, wm } = mainApplyMultiplier(
+        val,
+        boardMultipliers[r][c],
+      );
       val = adjVal;
       wmult *= wm;
     } else {
-      val = LETTER_VALUES[ch] ?? 0;
+      val = letterValues[ch] ?? 0;
     }
     score += val;
     word += ch;
@@ -89,15 +86,19 @@ function crossWordScore(
 
 // ── Core ──────────────────────────────────────────────────────
 
-function findAnchors(board: string[][]): {
+function findAnchors(
+  board: string[][],
+  config: GameConfig,
+): {
   anchors: Set<string>;
   hasTiles: boolean;
 } {
+  const { boardWidth, boardHeight, centerSquare } = config;
   const anchors = new Set<string>();
   let hasTiles = false;
 
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) {
+  for (let r = 0; r < boardHeight; r++) {
+    for (let c = 0; c < boardWidth; c++) {
       if (board[r][c] !== " ") {
         hasTiles = true;
         for (const [dr, dc] of [
@@ -110,9 +111,9 @@ function findAnchors(board: string[][]): {
             nc = c + dc;
           if (
             nr >= 0 &&
-            nr < 15 &&
+            nr < boardHeight &&
             nc >= 0 &&
-            nc < 15 &&
+            nc < boardWidth &&
             board[nr][nc] === " "
           ) {
             anchors.add(`${nr},${nc}`);
@@ -122,7 +123,7 @@ function findAnchors(board: string[][]): {
     }
   }
 
-  if (anchors.size === 0) anchors.add("7,7");
+  if (anchors.size === 0) anchors.add(`${centerSquare[0]},${centerSquare[1]}`);
   return { anchors, hasTiles };
 }
 
@@ -135,7 +136,16 @@ function tryPlace(
   rack: string[],
   hasTiles: boolean,
   trie: Trie,
+  config: GameConfig,
 ): number | null {
+  const {
+    letterValues,
+    boardMultipliers,
+    bingoBonus,
+    rackSize,
+    boardWidth,
+    boardHeight,
+  } = config;
   const tiles = [...rack];
   let score = 0;
   let wmult = 1;
@@ -150,7 +160,7 @@ function tryPlace(
     if (board[r][c] !== " ") {
       if (board[r][c] !== ch) return null;
       connects = true;
-      score += LETTER_VALUES[ch] ?? 0;
+      score += letterValues[ch] ?? 0;
     } else {
       tilesPlaced++;
       let isBlank = false;
@@ -159,7 +169,7 @@ function tryPlace(
       const tileIdx = tiles.indexOf(ch);
       if (tileIdx !== -1) {
         tiles.splice(tileIdx, 1);
-        val = LETTER_VALUES[ch] ?? 0;
+        val = letterValues[ch] ?? 0;
       } else {
         const blankIdx = tiles.indexOf(" ");
         if (blankIdx !== -1) {
@@ -171,11 +181,14 @@ function tryPlace(
         }
       }
 
-      const [adjVal, wm] = applyMult(val, BOARD_MULT[r][c]);
+      const { val: adjVal, wm } = mainApplyMultiplier(
+        val,
+        boardMultipliers[r][c],
+      );
       wmult *= wm;
       score += adjVal;
 
-      const xs = crossWordScore(board, r, c, ch, d, isBlank, trie);
+      const xs = crossWordScore(board, r, c, ch, d, isBlank, trie, config);
       if (xs === -1) return null;
       xscore += xs;
     }
@@ -186,15 +199,27 @@ function tryPlace(
 
   // Check no adjacent letter before word start
   const [br, bc] = rc(startR, startC, -1, d);
-  if (br >= 0 && br < 15 && bc >= 0 && bc < 15 && board[br][bc] !== " ")
+  if (
+    br >= 0 &&
+    br < boardHeight &&
+    bc >= 0 &&
+    bc < boardWidth &&
+    board[br][bc] !== " "
+  )
     return null;
 
   // Check no adjacent letter after word end
   const [ar, ac] = rc(startR, startC, word.length, d);
-  if (ar >= 0 && ar < 15 && ac >= 0 && ac < 15 && board[ar][ac] !== " ")
+  if (
+    ar >= 0 &&
+    ar < boardHeight &&
+    ac >= 0 &&
+    ac < boardWidth &&
+    board[ar][ac] !== " "
+  )
     return null;
 
-  const bingo = tilesPlaced === 7 ? 40 : 0;
+  const bingo = tilesPlaced === rackSize ? bingoBonus : 0;
   return score * wmult + xscore + bingo;
 }
 
@@ -205,14 +230,16 @@ export function bruteForceSolve(
   rackStr: string,
   dictionary: Set<string>,
   trie: Trie,
+  config: GameConfig,
 ): Move[] {
+  const { boardWidth, boardHeight } = config;
   const rack = rackStr.toUpperCase().replace(/\?/g, " ").split("");
-  const { anchors, hasTiles } = findAnchors(board);
+  const { anchors, hasTiles } = findAnchors(board, config);
 
   // Pre-filter: collect available letters (rack + board)
   const boardLetters = new Set<string>();
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) {
+  for (let r = 0; r < boardHeight; r++) {
+    for (let c = 0; c < boardWidth; c++) {
       if (board[r][c] !== " ") boardLetters.add(board[r][c]);
     }
   }
@@ -220,7 +247,7 @@ export function bruteForceSolve(
   const available = new Set([...boardLetters, ...rackLetters]);
   const numBlanks = rack.filter((ch) => ch === " ").length;
 
-  // Filter dictionary like the Python version
+  // Filter dictionary
   let candidates: string[];
   if (numBlanks === 0) {
     candidates = [...dictionary].filter((w) =>
@@ -241,7 +268,7 @@ export function bruteForceSolve(
   const resultsMap = new Map<string, Move>();
 
   for (const word of candidates) {
-    if (word.length > 15) continue;
+    if (word.length > Math.max(boardWidth, boardHeight)) continue;
 
     for (const anchorKey of anchors) {
       const [ra, ca] = anchorKey.split(",").map(Number);
@@ -250,12 +277,23 @@ export function bruteForceSolve(
         for (let offset = 0; offset < word.length; offset++) {
           const [sr, sc] = rc(ra, ca, -offset, d);
           const [er, ec] = rc(sr, sc, word.length - 1, d);
-          if (sr < 0 || sc < 0 || er > 14 || ec > 14) continue;
+          if (sr < 0 || sc < 0 || er >= boardHeight || ec >= boardWidth)
+            continue;
 
           const key = `${word}-${sr}-${sc}-${d}`;
           if (resultsMap.has(key)) continue;
 
-          const s = tryPlace(board, word, sr, sc, d, rack, hasTiles, trie);
+          const s = tryPlace(
+            board,
+            word,
+            sr,
+            sc,
+            d,
+            rack,
+            hasTiles,
+            trie,
+            config,
+          );
           if (s !== null) {
             resultsMap.set(key, {
               word,

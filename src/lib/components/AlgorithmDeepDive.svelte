@@ -1,10 +1,13 @@
 <script lang="ts">
-  // No props needed for this static educational component
+  import { fade, fly } from "svelte/transition";
+
+  // Internal state for the deep dive comparison
+  let selectedGame = $state("CrossPlay");
 </script>
 
 <div class="w-full max-w-5xl mx-auto mt-16 mb-32 px-4 sm:px-6">
   <!-- Article Header -->
-  <header class="text-center space-y-6 mb-20">
+  <header class="text-left space-y-6 mb-20">
     <div
       class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-widest"
     >
@@ -12,7 +15,7 @@
       Algorithm Deep Dive
     </div>
     <h1 class="text-4xl md:text-6xl font-black text-slate-900 tracking-tight">
-      Solving Crosswords<sup
+      Solving {selectedGame}<sup
         class="text-lg md:text-2xl text-slate-400 align-top top-0">®</sup
       >
       in
@@ -22,7 +25,7 @@
       >
     </h1>
     <p
-      class="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 font-medium leading-relaxed"
+      class="max-w-2xl text-lg md:text-xl text-slate-500 font-medium leading-relaxed"
     >
       How we use Tries, Bitmasks, and Recursive Backtracking to prune a search
       space of millions down to a few hundred checks.
@@ -42,8 +45,9 @@
         <p class="text-slate-600 text-lg leading-relaxed">
           For a computer, the problem is exact opposite. It sees <em
             >too many</em
-          > options. With 7 tiles and a 15x15 board, the number of possible moves
-          is astronomical.
+          >
+          options. With 7 tiles and a 15x15 board, the number of possible moves is
+          astronomical.
         </p>
         <p class="text-slate-600 text-lg leading-relaxed">
           With that size optimization is imparitive. We were able to optimize
@@ -142,10 +146,10 @@
 
     <!-- Section 2: The Librarian (Analogy) -->
     <section
-      class="bg-orange-50 rounded-[2.5rem] p-8 md:p-16 text-center space-y-8"
+      class="bg-orange-50 rounded-[2.5rem] p-8 md:p-16 text-left space-y-8"
     >
       <div
-        class="mx-auto w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm"
+        class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm"
       >
         <svg
           class="w-8 h-8 text-orange-600"
@@ -160,7 +164,7 @@
           /></svg
         >
       </div>
-      <div class="max-w-2xl mx-auto space-y-4">
+      <div class="max-w-2xl space-y-4">
         <h2 class="text-3xl font-black text-slate-900">
           The "Librarian" Strategy
         </h2>
@@ -276,78 +280,149 @@
       </div>
     </section>
 
-    <!-- Section 5: Scoring (Redesigned) -->
-    <section class="space-y-12">
-      <div class="max-w-3xl mx-auto text-center space-y-6">
-        <div
-          class="text-orange-600 font-bold tracking-widest text-xs uppercase"
-        >
-          Step 3: Evaluation
-        </div>
-        <h2 class="text-3xl font-black text-slate-900">
-          How We Pick the Winner
-        </h2>
-        <p class="text-slate-600 text-lg leading-relaxed">
-          Finding valid words is only half the battle. We need to find the <em
-            >best</em
+    <!-- Section 5: Scoring (Redesigned & Interactive) -->
+    <section
+      class="space-y-12 bg-slate-50/50 rounded-[3rem] p-8 md:p-16 border border-slate-100"
+    >
+      <div class="max-w-3xl text-left space-y-8">
+        <div class="space-y-3">
+          <div
+            class="text-orange-600 font-bold tracking-widest text-xs uppercase"
           >
-          word. Our scoring engine follows the official 
+            Step 3: Evaluation
+          </div>
+          <h2 class="text-4xl font-black text-slate-900">
+            How We Pick the Winner
+          </h2>
+        </div>
+
+        <!-- Minimalist Switcher -->
+        <div
+          class="inline-flex bg-slate-200/50 p-1 rounded-2xl border border-slate-200 backdrop-blur-sm"
+        >
+          {#each ["CrossPlay", "Scrabble"] as game}
+            <button
+              onclick={() => (selectedGame = game)}
+              class="px-6 py-2 text-sm font-black rounded-xl transition-all {selectedGame ===
+              game
+                ? 'bg-white text-orange-600 shadow-md transform scale-105'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}"
+            >
+              {game.toUpperCase()}
+            </button>
+          {/each}
+        </div>
+
+        <p class="text-slate-600 text-lg leading-relaxed max-w-xl">
+          Finding valid words is only half the battle. Our engine dynamically
+          adapts to the scoring rules of
           <a
-            href="https://help.nytimes.com/360011158491-New-York-Times-Games/crossplay-app"
+            href={selectedGame === "CrossPlay"
+              ? "https://help.nytimes.com/360011158491-New-York-Times-Games/crossplay-app"
+              : "https://www.scrabblepages.com/scrabble/rules/"}
             target="_blank"
-            class="text-slate-900 font-bold underline decoration-slate-300 hover:decoration-orange-500 transition-all"
-            >NYT Crossplay rules</a
-          >.
+            rel="noopener noreferrer"
+            class="font-bold text-slate-900 underline decoration-orange-500/30 hover:decoration-orange-500 transition-all"
+          >
+            {selectedGame === "CrossPlay"
+              ? "NYT Crossplay"
+              : "Official Scrabble"}
+          </a>.
         </p>
       </div>
 
       <div class="grid md:grid-cols-3 gap-8">
-        <!-- Card 1: Premium Squares -->
-        <div
-          class="group relative rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-200/50 transition-all duration-300 border border-slate-100"
-        >
-          <h4 class="mb-3 text-xl font-black text-slate-900">
-            Premium Squares
-          </h4>
-          <p class="text-slate-600 leading-relaxed">
-            We prioritize <strong>Triple Word</strong> and
-            <strong>Double Word</strong> bonuses. A short word on a triple score
-            often beats a long word on an empty board.
-          </p>
-        </div>
+        {#key selectedGame}
+          <!-- Card 1: Premium Squares -->
+          <div
+            in:fly={{ y: 20, duration: 400, delay: 0 }}
+            class="group relative rounded-[2rem] bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-200/50 transition-all duration-300 border border-slate-100 overflow-hidden"
+          >
+            <div
+              class="absolute -top-12 -right-12 w-32 h-32 bg-indigo-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"
+            ></div>
+            <div class="relative">
+              <h4 class="mb-3 text-2xl font-black text-slate-900">
+                Premium Squares
+              </h4>
+              <p class="text-slate-600 leading-relaxed font-medium">
+                {#if selectedGame === "CrossPlay"}
+                  We prioritize <strong>Triple Word</strong> and
+                  <strong>Double Word</strong> bonuses. A short word on a triple
+                  score often beats a long word on an empty board.
+                {:else}
+                  Scrabble uses higher board multipliers. We focus on hitting
+                  <strong>Triple Word (TW)</strong> and
+                  <strong>Triple Letter (TL)</strong>
+                  spots for maximum impact.
+                {/if}
+              </p>
+            </div>
+          </div>
 
-        <!-- Card 2: The Bingo -->
-        <div
-          class="group relative rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-orange-200/50 transition-all duration-300 border border-slate-100"
-        >
-          <h4 class="mb-3 text-xl font-black text-slate-900">
-            The Bingo Bonus
-          </h4>
-          <p class="text-slate-600 leading-relaxed">
-            Using all 7 tiles triggers a massive <strong>40-point bonus</strong
-            >. This is the "Golden Snitch" of the game—it almost always
-            guarantees a top ranking.
-          </p>
-        </div>
+          <!-- Card 2: The Bingo -->
+          <div
+            in:fly={{ y: 20, duration: 400, delay: 100 }}
+            class="group relative rounded-[2rem] bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-orange-200/50 transition-all duration-300 border border-slate-100 overflow-hidden"
+          >
+            <div
+              class="absolute -top-12 -right-12 w-32 h-32 bg-orange-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"
+            ></div>
+            <div class="relative">
+              <h4 class="mb-3 text-2xl font-black text-slate-900">
+                The Bingo Bonus
+              </h4>
+              <p class="text-slate-600 leading-relaxed font-medium">
+                {#if selectedGame === "CrossPlay"}
+                  Using all 7 tiles triggers a massive <strong
+                    >40-point bonus</strong
+                  >. This is the "Golden Snitch" of the game—it almost always
+                  guarantees a top ranking.
+                {:else}
+                  In Scrabble, using all 7 tiles awards a massive <strong
+                    >50-point bonus</strong
+                  >. It's harder to achieve but more rewarding than in
+                  CrossPlay.
+                {/if}
+              </p>
+            </div>
+          </div>
 
-        <!-- Card 3: Synergy -->
-        <div
-          class="group relative rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-emerald-200/50 transition-all duration-300 border border-slate-100"
-        >
-          <h4 class="mb-3 text-xl font-black text-slate-900">
-            Cross-Word Synergy
-          </h4>
-          <p class="text-slate-600 leading-relaxed">
-            We sum points for <em>every</em> word formed. Placing an 'S' to pluralize
-            a vertical word while creating a horizontal word counts for both.
-          </p>
-        </div>
+          <!-- Card 3: Synergy vs Strategy -->
+          <div
+            in:fly={{ y: 20, duration: 400, delay: 200 }}
+            class="group relative rounded-[2rem] bg-white p-8 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-emerald-200/50 transition-all duration-300 border border-slate-100 overflow-hidden"
+          >
+            <div
+              class="absolute -top-12 -right-12 w-32 h-32 bg-emerald-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"
+            ></div>
+            <div class="relative">
+              <h4 class="mb-3 text-2xl font-black text-slate-900">
+                {#if selectedGame === "CrossPlay"}
+                  Parallel Play
+                {:else}
+                  Tile Strategy
+                {/if}
+              </h4>
+              <p class="text-slate-600 leading-relaxed font-medium">
+                {#if selectedGame === "CrossPlay"}
+                  We sum points for every word formed. Placing an 'S' to
+                  pluralize a word while creating a new one counts for both.
+                {:else}
+                  Scrabble has a pool of <strong>100 tiles</strong> with different
+                  counts. We prioritize preserving high-value letters unless the
+                  board position is too good to pass up.
+                {/if}
+              </p>
+            </div>
+          </div>
+        {/key}
       </div>
     </section>
 
     <!-- Section 6: The Algorithm (Code) -->
     <section class="space-y-12">
-      <div class="max-w-3xl mx-auto text-center space-y-6">
+      <div class="max-w-3xl text-left space-y-6">
         <div
           class="text-orange-600 font-bold tracking-widest text-xs uppercase"
         >
@@ -425,11 +500,11 @@
     </section>
 
     <!-- Footer CTA -->
-    <footer class="text-center">
+    <footer class="text-left">
       <p class="text-slate-500 mb-8 font-medium">
         Want to see the actual code?
       </p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <div class="flex flex-col sm:flex-row gap-4 justify-start">
         <a
           href="https://github.com/bryantclark/CrossCheat"
           target="_blank"
